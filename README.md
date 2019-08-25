@@ -1,4 +1,4 @@
-# 'ra-snoop`, a janky way to track changes to residentadvisor.net artist listings
+# `ra-snoop`, a janky way to track changes to residentadvisor.net artist listings
 
 https://www.residentadvisor.net has fairly comprehensive listings for lots of
 electronic music artists but (as far as I can tell) no means to be notified of
