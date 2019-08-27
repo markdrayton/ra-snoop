@@ -23,10 +23,9 @@ def read_cached(path):
         return []
 
 def save(path, listing):
-    f = open(path, "w")
-    f.write("\n".join(listing))
-    f.write("\n")
-    f.close()
+    with open(path, "w") as f:
+        for line in listing:
+            print(line, file=f)
 
 args = parse_args()
 listings = {artist: scraper.scrape(artist) for artist in args.artists}
