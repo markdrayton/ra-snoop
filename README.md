@@ -19,4 +19,4 @@ $ ./snoop.py deadmau5
 
 ## Bugs etc
 
-Only works for 2019, likely many other nits.
+Many, probably.
