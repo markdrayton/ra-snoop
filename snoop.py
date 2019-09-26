@@ -5,8 +5,13 @@ import argparse
 import asyncio
 import datetime
 import os
+import sys
 
 from parser import parse_doc
+
+
+class ArtistNotFoundError(Exception):
+    pass
 
 
 def parse_args():
@@ -55,6 +60,9 @@ def url(artist, year):
 async def fetch_year(session, artist, year):
     resp = await session.request(method="GET", url=url(artist, year))
     resp.raise_for_status()
+    if len(resp.history):
+        # unknown artists redirect to the index page
+        raise ArtistNotFoundError()
     html = await resp.text()
     return parse_doc(html)
 
@@ -74,7 +82,7 @@ async def fetch_listings(artists, start_year):
         tasks = []
         for artist in artists:
             tasks.append(fetch_listing(session, artist, start_year))
-        return await asyncio.gather(*tasks)
+        return await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def main():
@@ -83,6 +91,10 @@ async def main():
 
     unknown = set()
     for artist, listing in zip(args.artists, listings):
+        if isinstance(listing, ArtistNotFoundError):
+            print(f"warning: unknown artist {artist}", file=sys.stderr)
+            unknown.add(artist)
+            continue
         saved = set(read_cached(cache_path(args.cache, artist)))
         scraped = set(listing)
         added = sorted(scraped - saved)
@@ -103,7 +115,8 @@ async def main():
             if e.errno != 17:  # EEXIST
                 raise
         for artist, listing in zip(args.artists, listings):
-            save(cache_path(args.cache, artist), listing)
+            if artist not in unknown:
+                save(cache_path(args.cache, artist), listing)
 
 
 asyncio.run(main())
