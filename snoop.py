@@ -4,6 +4,7 @@ import aiohttp
 import argparse
 import asyncio
 import datetime
+import errno
 import os
 import sys
 
@@ -112,7 +113,7 @@ async def main():
         try:
             os.mkdir(args.cache)
         except OSError as e:
-            if e.errno != 17:  # EEXIST
+            if e.errno != errno.EEXIST:
                 raise
         for artist, listing in zip(args.artists, listings):
             if artist not in unknown:
