@@ -4,17 +4,25 @@ import argparse
 import os
 import scraper
 
+
 def parse_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument("-c", "--cache", default="~/.saved", metavar="DIR",
-            type=lambda x: os.path.expanduser(x),
-            help="cache dir (default %(default)s)")
+    ap.add_argument(
+        "-c",
+        "--cache",
+        default="~/.saved",
+        metavar="DIR",
+        type=lambda x: os.path.expanduser(x),
+        help="cache dir (default %(default)s)",
+    )
     ap.add_argument("-n", "--dryrun", action="store_true")
     ap.add_argument("artists", nargs="+", metavar="artist")
     return ap.parse_args()
 
+
 def cache_path(base, artist):
     return os.path.join(base, artist)
+
 
 def read_cached(path):
     try:
@@ -22,10 +30,12 @@ def read_cached(path):
     except FileNotFoundError:
         return []
 
+
 def save(path, listing):
     with open(path, "w") as f:
         for line in listing:
             print(line, file=f)
+
 
 args = parse_args()
 listings = {artist: scraper.scrape(artist) for artist in args.artists}
