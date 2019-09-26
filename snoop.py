@@ -93,7 +93,6 @@ async def main():
     unknown = set()
     for artist, listing in zip(args.artists, listings):
         if isinstance(listing, ArtistNotFoundError):
-            print(f"warning: unknown artist {artist}", file=sys.stderr)
             unknown.add(artist)
             continue
         saved = set(read_cached(cache_path(args.cache, artist)))
@@ -108,6 +107,11 @@ async def main():
             for line in added:
                 print(f"+{line}")
             print()
+
+    if unknown:
+        print(
+            f"warning: unknown artists: {', '.join(sorted(unknown))}", file=sys.stderr
+        )
 
     if not args.dryrun:
         try:
