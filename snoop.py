@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
+import aiohttp
 import argparse
+import asyncio
+import datetime
 import os
-import scraper
+
+from parser import parse_doc
 
 
 def parse_args():
@@ -16,6 +20,13 @@ def parse_args():
         help="cache dir (default %(default)s)",
     )
     ap.add_argument("-n", "--dryrun", action="store_true")
+    ap.add_argument(
+        "-s",
+        "--start-year",
+        help="start year (default %(default)s)",
+        type=int,
+        default=int(datetime.datetime.now().year),
+    )
     ap.add_argument("artists", nargs="+", metavar="artist")
     return ap.parse_args()
 
@@ -37,30 +48,62 @@ def save(path, listing):
             print(line, file=f)
 
 
-args = parse_args()
-listings = {artist: scraper.scrape(artist) for artist in args.artists}
+def url(artist, year):
+    return f"https://www.residentadvisor.net/dj/{artist}/dates?yr={year}"
 
-for artist in sorted(listings):
-    path = cache_path(args.cache, artist)
-    saved = set(read_cached(path))
-    scraped = set(listings[artist])
-    added = sorted(scraped - saved)
-    removed = sorted(saved - scraped)
-    if added or removed:
-        print("==> {}".format(artist))
-        print()
-        for line in removed:
-            print("-{}".format(line))
-        for line in added:
-            print("+{}".format(line))
-        print()
 
-if not args.dryrun:
-    try:
-        os.mkdir(args.cache)
-    except OSError as e:
-        if e.errno != 17:  # EEXIST
-            raise
-    for artist, listing in listings.items():
-        path = cache_path(args.cache, artist)
-        save(path, listing)
+async def fetch_year(session, artist, year):
+    resp = await session.request(method="GET", url=url(artist, year))
+    resp.raise_for_status()
+    html = await resp.text()
+    return parse_doc(html)
+
+
+async def fetch_listing(session, artist, start_year):
+    initial = await fetch_year(session, artist, start_year)
+    events = initial.events
+    for year in initial.years:
+        if year > start_year:
+            subsequent = await fetch_year(session, artist, year)
+            events.extend(subsequent.events)
+    return [f"{event.date:10}  {event.name:40}  {event.address}" for event in events]
+
+
+async def fetch_listings(artists, start_year):
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for artist in artists:
+            tasks.append(fetch_listing(session, artist, start_year))
+        return await asyncio.gather(*tasks)
+
+
+async def main():
+    args = parse_args()
+    listings = await fetch_listings(args.artists, args.start_year)
+
+    unknown = set()
+    for artist, listing in zip(args.artists, listings):
+        saved = set(read_cached(cache_path(args.cache, artist)))
+        scraped = set(listing)
+        added = sorted(scraped - saved)
+        removed = sorted(saved - scraped)
+        if added or removed:
+            print(f"==> {artist}")
+            print()
+            for line in removed:
+                print(f"-{line}")
+            for line in added:
+                print(f"+{line}")
+            print()
+
+    if not args.dryrun:
+        try:
+            os.mkdir(args.cache)
+        except OSError as e:
+            if e.errno != 17:  # EEXIST
+                raise
+        for artist, listing in zip(args.artists, listings):
+            save(cache_path(args.cache, artist), listing)
+
+
+asyncio.run(main())
