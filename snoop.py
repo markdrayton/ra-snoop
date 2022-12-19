@@ -11,6 +11,7 @@ import sys
 from parser import parse_doc
 
 
+UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0"
 
 
 def parse_args():
@@ -24,13 +25,6 @@ def parse_args():
         help="cache dir (default %(default)s)",
     )
     ap.add_argument("-n", "--dryrun", action="store_true")
-    ap.add_argument(
-        "-s",
-        "--start-year",
-        help="start year (default %(default)s)",
-        type=int,
-        default=int(datetime.datetime.now().year),
-    )
     ap.add_argument("artists", nargs="+", metavar="artist")
     return ap.parse_args()
 
@@ -52,38 +46,31 @@ def save(path, listing):
             print(line, file=f)
 
 
-def url(artist, year):
-    return f"https://www.residentadvisor.net/dj/{artist}/dates?yr={year}"
+def url(artist):
+    return f"https://ra.co/dj/{artist}/tour-dates"
 
 
-async def fetch_year(session, artist, year):
-    resp = await session.request(method="GET", url=url(artist, year))
+async def fetch_listing(session, artist):
+    resp = await session.request(method="GET", url=url(artist))
     resp.raise_for_status()
     html = await resp.text()
-    return parse_doc(html)
+    return [
+        f"{event.date:10}  {event.name:50}  {event.address}"
+        for event in parse_doc(html)
+    ]
 
 
-async def fetch_listing(session, artist, start_year):
-    initial = await fetch_year(session, artist, start_year)
-    events = initial.events
-    for year in initial.years:
-        if year > start_year:
-            subsequent = await fetch_year(session, artist, year)
-            events.extend(subsequent.events)
-    return [f"{event.date:10}  {event.name:40}  {event.address}" for event in events]
-
-
-async def fetch_listings(artists, start_year):
-    async with aiohttp.ClientSession() as session:
+async def fetch_listings(artists):
+    async with aiohttp.ClientSession(headers={"User-Agent": UA}) as session:
         tasks = []
         for artist in artists:
-            tasks.append(fetch_listing(session, artist, start_year))
+            tasks.append(fetch_listing(session, artist))
         return await asyncio.gather(*tasks)
 
 
 async def main():
     args = parse_args()
-    listings = await fetch_listings(args.artists, args.start_year)
+    listings = await fetch_listings(args.artists)
 
     for artist, listing in zip(args.artists, listings):
         saved = set(read_cached(cache_path(args.cache, artist)))
