@@ -4,11 +4,16 @@ import aiohttp
 import argparse
 import asyncio
 import datetime
-import errno
+import json
 import os
 import sys
+from collections import defaultdict
+from collections import namedtuple
 
 from parser import parse_events
+
+
+Event = namedtuple("Event", "date name address")
 
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0"
@@ -19,8 +24,8 @@ def parse_args():
     ap.add_argument(
         "-c",
         "--cache",
-        default="~/.saved",
-        metavar="DIR",
+        default="~/.ra-snoop.json",
+        metavar="PATH",
         type=lambda x: os.path.expanduser(x),
         help="cache dir (default %(default)s)",
     )
@@ -29,21 +34,19 @@ def parse_args():
     return ap.parse_args()
 
 
-def cache_path(base, artist):
-    return os.path.join(base, artist)
-
-
 def read_cached(path):
     try:
-        return open(path).read().splitlines()
+        return {
+            artist: [Event(*event) for event in events]
+            for artist, events in json.load(open(path)).items()
+        }
     except FileNotFoundError:
-        return []
+        return {}
 
 
-def save(path, listing):
+def save(path, listings):
     with open(path, "w") as f:
-        for line in listing:
-            print(line, file=f)
+        json.dump(listings, f)
 
 
 def url(artist):
@@ -54,10 +57,7 @@ async def fetch_listing(session, artist):
     resp = await session.request(method="GET", url=url(artist))
     resp.raise_for_status()
     html = await resp.text()
-    return [
-        f"{event.date:10}  {event.name:50}  {event.address}"
-        for event in parse_events(html)
-    ]
+    return [Event(*event) for event in parse_events(html)]
 
 
 async def fetch_listings(artists):
@@ -70,30 +70,29 @@ async def fetch_listings(artists):
 
 async def main():
     args = parse_args()
-    listings = await fetch_listings(args.artists)
+    artists = sorted(args.artists)
+    listings = await fetch_listings(artists)
+    cache = read_cached(args.cache)
 
-    for artist, listing in zip(args.artists, listings):
-        saved = set(read_cached(cache_path(args.cache, artist)))
+    output = defaultdict(list)
+
+    for artist, listing in zip(artists, listings):
+        saved = set(cache.get(artist, []))
         scraped = set(listing)
-        added = sorted(scraped - saved)
-        removed = sorted(saved - scraped)
-        if added or removed:
-            print(f"==> {artist}")
-            print()
-            for line in removed:
-                print(f"-{line}")
-            for line in added:
-                print(f"+{line}")
-            print()
+        for event in sorted(scraped - saved):
+            output[artist].append(("+", event))
+        for event in sorted(saved - scraped):
+            output[artist].append(("-", event))
+
+    for artist, events in sorted(output.items()):
+        print(f"==> {artist}")
+        print()
+        for change, event in sorted(events, key=lambda e: e[1].date):
+            print(f"{change}{event.date}  {event.name:50}  {event.address}")
+        print()
 
     if not args.dryrun:
-        try:
-            os.mkdir(args.cache)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
-        for artist, listing in zip(args.artists, listings):
-            save(cache_path(args.cache, artist), listing)
+        save(args.cache, dict(zip(artists, listings)))
 
 
 asyncio.run(main())
