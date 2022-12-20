@@ -8,7 +8,7 @@ import errno
 import os
 import sys
 
-from parser import parse_doc
+from parser import parse_events
 
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0"
@@ -56,7 +56,7 @@ async def fetch_listing(session, artist):
     html = await resp.text()
     return [
         f"{event.date:10}  {event.name:50}  {event.address}"
-        for event in parse_doc(html)
+        for event in parse_events(html)
     ]
 
 

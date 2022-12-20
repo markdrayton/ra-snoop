@@ -33,6 +33,6 @@ def parse_tree(tree):
     return [parse_event(event) for event in events]
 
 
-def parse_doc(doc):
+def parse_events(doc):
     tree = html.fromstring(doc, parser=HTMLParser(huge_tree=True))
     return parse_tree(tree)
