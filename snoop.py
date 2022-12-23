@@ -30,7 +30,10 @@ def parse_args():
         type=lambda x: os.path.expanduser(x),
         help="cache dir (default %(default)s)",
     )
-    ap.add_argument("-n", "--dryrun", action="store_true")
+    ap.add_argument("-n", "--dryrun", action="store_true", help="don't write cache")
+    ap.add_argument(
+        "-i", "--ignore-cache", action="store_true", help="don't read cache"
+    )
     ap.add_argument("artists", nargs="+", metavar="artist")
     return ap.parse_args()
 
@@ -73,7 +76,7 @@ async def main():
     args = parse_args()
     artists = sorted(args.artists)
     listings = await fetch_listings(artists)
-    cache = read_cached(args.cache)
+    cache = {} if args.ignore_cache else read_cached(args.cache)
 
     output = defaultdict(list)
 
