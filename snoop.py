@@ -14,6 +14,7 @@ from parser import parse_events
 
 
 Event = namedtuple("Event", "date name address")
+Change = namedtuple("Change", "symbol event")
 
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0"
@@ -80,19 +81,26 @@ async def main():
         saved = set(cache.get(artist, []))
         scraped = set(listing)
         for event in sorted(scraped - saved):
-            output[artist].append(("+", event))
+            output[artist].append(Change("+", event))
         for event in sorted(saved - scraped):
-            output[artist].append(("-", event))
+            output[artist].append(Change("-", event))
 
-    for artist, events in sorted(output.items()):
-        print(f"==> {artist}")
-        print()
-        for change, event in sorted(events, key=lambda e: e[1].date):
-            print(f"{change}{event.date}  {event.name:50}  {event.address}")
-        print()
+    if output:
+        namewidth = max(
+            len(change.event.name) for changes in output.values() for change in changes
+        )
 
-    if not args.dryrun:
-        save(args.cache, dict(zip(artists, listings)))
+        for artist, changes in sorted(output.items()):
+            print(f"==> {artist}")
+            print()
+            for symbol, event in sorted(changes, key=lambda c: c.event.date):
+                print(
+                    f"{symbol}{event.date}  {event.name:{namewidth}}  {event.address}"
+                )
+            print()
+
+        if not args.dryrun:
+            save(args.cache, dict(zip(artists, listings)))
 
 
 asyncio.run(main())
