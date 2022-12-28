@@ -29,7 +29,7 @@ def parse_event(event):
         raise ValueError(f"can't parse {date}")
     name = headx(event.xpath("h3/a/span/text()"))
     metadata = event.xpath("div[2]//span/text()")
-    address = ", ".join(metadata[:2])
+    address = ", ".join(reversed(metadata[:2]))
     return (f"{year:04}-{month:02}-{day:02}", name, address)
 
 
