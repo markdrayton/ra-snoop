@@ -9,15 +9,42 @@ import os
 import sys
 from collections import defaultdict
 from collections import namedtuple
+from functools import total_ordering
+
+import arrow
 
 from parser import parse_events
 
 
-Event = namedtuple("Event", "date name address")
 Change = namedtuple("Change", "symbol event")
 
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0"
+
+
+@total_ordering
+class Event:
+    def __init__(self, date, name, address):
+        self.date = arrow.get(date)
+        self.name = name
+        self.address = address
+
+    def __lt__(self, other):
+        return (self.date, self.name, self.address) < (
+            other.date,
+            other.name,
+            other.address,
+        )
+
+    def __eq__(self, other):
+        return (self.date, self.name, self.address) == (
+            other.date,
+            other.name,
+            other.address,
+        )
+
+    def __hash__(self):
+        return hash((self.date, self.name, self.address))
 
 
 def parse_args():
@@ -49,8 +76,18 @@ def read_cached(path):
 
 
 def save(path, listings):
+    # TODO: actually serialize Events properly
     with open(path, "w") as f:
-        json.dump(listings, f)
+        json.dump(
+            {
+                artist: [
+                    (event.date.format("YYYY-MM-DD"), event.name, event.address)
+                    for event in events
+                ]
+                for artist, events in listings.items()
+            },
+            f,
+        )
 
 
 def url(artist):
@@ -98,7 +135,7 @@ async def main():
             print()
             for symbol, event in sorted(changes, key=lambda c: c.event.date):
                 print(
-                    f"{symbol}{event.date}  {event.name:{namewidth}}  {event.address}"
+                    f"{symbol}{event.date.format('YYYY-MM-DD')}  {event.name:{namewidth}}  {event.address}"
                 )
             print()
 
