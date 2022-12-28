@@ -75,6 +75,14 @@ def read_cached(path):
         return {}
 
 
+def filter_past(listings):
+    today = arrow.get().floor("day")
+    return {
+        artist: [event for event in events if event.date >= today]
+        for artist, events in listings.items()
+    }
+
+
 def save(path, listings):
     # TODO: actually serialize Events properly
     with open(path, "w") as f:
@@ -114,6 +122,7 @@ async def main():
     artists = sorted(args.artists)
     listings = await fetch_listings(artists)
     cache = {} if args.ignore_cache else read_cached(args.cache)
+    cache = filter_past(cache)
 
     output = defaultdict(list)
 
