@@ -19,7 +19,10 @@ from parser import parse_events
 Change = namedtuple("Change", "symbol event")
 
 
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0"
+HEADERS = {
+    "Accept-Language": "en-US,en;q=0.5",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0",
+}
 
 
 @total_ordering
@@ -110,7 +113,7 @@ async def fetch_listing(session, artist):
 
 
 async def fetch_listings(artists):
-    async with aiohttp.ClientSession(headers={"User-Agent": UA}) as session:
+    async with aiohttp.ClientSession(headers=HEADERS) as session:
         tasks = []
         for artist in artists:
             tasks.append(fetch_listing(session, artist))
